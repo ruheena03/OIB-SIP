@@ -1,0 +1,82 @@
+import speech_recognition as sr  # Importing the speech recognition library
+import pyttsx3  # Importing the text-to-speech library
+import wikipedia  # Importing the Wikipedia API library
+import requests  # Importing the HTTP library for making API requests
+
+# Initialize the Text-to-Speech engine
+engine = pyttsx3.init()
+
+def speak(text):
+    """Function to convert text to speech"""
+    engine.say(text)  # Pass the text to the TTS engine
+    engine.runAndWait()  # Wait for the speech to finish
+
+def listen():
+    """Function to capture voice input and convert it to text"""
+    recognizer = sr.Recognizer()  # Initialize the recognizer
+    with sr.Microphone() as source:  # Use the microphone as the audio source
+        print("Listening...")  # Indicate that the system is listening
+        recognizer.adjust_for_ambient_noise(source)  # Adjust for ambient noise
+        audio = recognizer.listen(source)  # Capture the audio
+    try:
+        print("Recognizing...")  # Indicate that recognition is in progress
+        query = recognizer.recognize_google(audio, language='en-US')  # Convert audio to text using Google API
+        print(f"You said: {query}\n")  # Print the recognized text
+    except sr.UnknownValueError:
+        print("Sorry, I didn't catch that. Please try again.")  # Handle recognition errors
+        return None  # Return None if recognition failed
+    except sr.RequestError as e:
+        print(f"Could not request results from Google Speech Recognition service; {e}")  # Handle API request errors
+        return None  # Return None if request failed
+    return query.lower()  # Convert the recognized text to lowercase and return it
+
+def get_weather(city):
+    """Function to fetch weather updates from OpenWeatherMap API"""
+    api_key = '354c1db7b55896d1204f847047fec3e7'  # Your OpenWeatherMap API key
+    url = f'http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric'  # Construct the API URL
+    try:
+        response = requests.get(url)  # Make the API request
+        response.raise_for_status()  # Raise an HTTPError for bad responses
+        data = response.json()  # Parse the JSON response
+        if data['cod'] == 200:  # Check if the response code is 200 (success)
+            weather = data['weather'][0]['description']  # Get the weather description
+            temperature = data['main']['temp']  # Get the temperature
+            return f"The weather in {city} is {weather} with a temperature of {temperature}°C."  # Return the weather info
+        else:
+            return f"Error: {data.get('message', 'Unable to fetch weather information.')}"  # Return an error message
+    except requests.exceptions.RequestException as e:
+        return f"Error: Unable to fetch weather information due to {str(e)}"  # Handle request exceptions
+    except ValueError as e:
+        return "Error: Unable to parse JSON response."  # Handle JSON parsing errors
+
+def assistant():
+    """Function to handle user commands and perform corresponding actions"""
+    speak("Hello! How can I assist you today?")  # Greet the user
+    while True:  # Infinite loop to keep the assistant running
+        query = listen()  # Capture the user's voice input
+        if query:  # If the query is not None
+            if "stop" in query:  # Check if the user said "stop"
+                speak("Goodbye!")  # Say goodbye
+                break  # Exit the loop to stop the assistant
+            elif "wikipedia" in query:  # Check if the query is about Wikipedia
+                speak("Searching Wikipedia...")  # Inform the user
+                query = query.replace("wikipedia", "")  # Remove the keyword "wikipedia" from the query
+                try:
+                    result = wikipedia.summary(query, sentences=2)  # Get a summary from Wikipedia
+                    speak("According to Wikipedia")  # Preface the result
+                    speak(result)  # Read the result aloud
+                except wikipedia.exceptions.DisambiguationError as e:
+                    speak(f"Your query is too ambiguous. Please be more specific.")  # Handle disambiguation errors
+                except wikipedia.exceptions.PageError as e:
+                    speak(f"Sorry, I couldn't find any information on that topic.")  # Handle page errors
+            elif "weather" in query:  # Check if the query is about the weather
+                speak("Sure, which city?")  # Ask for the city name
+                city = listen()  # Capture the city name
+                if city:  # If the city name is not None
+                    weather_info = get_weather(city)  # Fetch the weather information
+                    print(weather_info)  # Print the weather forecast in the terminal
+                    speak(weather_info)  # Speak the weather forecast
+            # Add more commands and integrations as needed
+
+if __name__ == "__main__":
+    assistant()  # Run the assistant function if this script is executed
